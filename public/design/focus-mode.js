@@ -36,6 +36,7 @@ const FocusMode = (() => {
   let lastCue = -1, restCue = -1;
   let restEndAt = 0, muted = false;
   let audio = null, lock = null;
+  let bgHandle = null;
 
   const q = (sel) => root.querySelector(sel);
   const pad = (n) => String(n).padStart(2, '0');
@@ -263,6 +264,10 @@ const FocusMode = (() => {
       </div>`;
     document.body.appendChild(root);
 
+    /* background vivo (se bg-fx.js è caricato): luce + particelle dentro l'overlay */
+    const bg = (typeof BgFX !== 'undefined') ? BgFX : null;
+    bgHandle = bg ? bg.attach(q('#fxOverlay'), { intensity: 0.5, density: 0.6, zIndex: 3, radius: 340 }) : null;
+
     q('#fxClose').onclick = (e) => { e.stopPropagation(); close(); };
     q('#fxMute').onclick = (e) => {
       e.stopPropagation();
@@ -306,6 +311,7 @@ const FocusMode = (() => {
     document.removeEventListener('visibilitychange', onVis);
     document.body.style.overflow = '';
     lockOff();
+    if (bgHandle) { bgHandle.destroy(); bgHandle = null; }
     if (root && root.parentNode) root.parentNode.removeChild(root);
     root = null; cfg = null; phase = 'idle';
   }

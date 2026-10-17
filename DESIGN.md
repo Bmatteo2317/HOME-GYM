@@ -4,7 +4,7 @@ Linee guida UI/UX per l'app di calistenics (Push-up, Trazioni, Plank, Addominali
 Stile: **high-contrast, dark mode nativa, orientata alla performance**. L'interfaccia
 deve essere leggibile **a 2 metri di distanza** (atleta a terra che fa plank/push-up).
 
-> File operativi: `public/design/` — `tokens.css`, `components.css`, `focus.css`, `focus-mode.js`, `focus-demo.html`
+> File operativi: `public/design/` — `tokens.css`, `components.css`, `focus.css`, `focus-mode.js`, `bg-fx.js`, `focus-demo.html`
 > Demo live (dopo il deploy): `/design/focus-demo.html` · in locale: aprire il file direttamente nel browser.
 
 ---
@@ -45,14 +45,15 @@ public/design/
 ├── components.css   # 2. Componenti base riusabili (card, btn, chip, kpi, icone)
 ├── focus.css        # 3. Stile della Schermata B (Focus Mode)
 ├── focus-mode.js    # 4. Logica della Schermata B (componente autonomo, API FocusMode.open)
-└── focus-demo.html  # 5. Pagina d'esempio + test su telefono
+├── bg-fx.js         # 5. Background vivo: particelle + luce che segue il puntatore
+└── focus-demo.html  # 6. Pagina d'esempio + test su telefono
 ```
 
 Passo-passo:
 1. **tokens.css per primo**: ogni altro file usa SOLO `var(--…)`, mai HEX diretti. Cambiare tema = toccare un solo file.
 2. **components.css**: elementi generici senza logica (`.card`, `.btn.volt`, `.chip`, `.kpi`, `.icon`). Riusabili in tutte le schermate.
 3. **Un file CSS per schermata complessa** (`focus.css`): evita collisioni e si carica solo dove serve.
-4. **Un file JS per componente** con API esplicita (`focus-mode.js` → `FocusMode.open({...})` / `.close()`): quando si integra nell'app basta una chiamata, e in futuro si può chiamare `saveDay()` dentro `onSave`.
+4. **Un file JS per componente** con API esplicita (`focus-mode.js` → `FocusMode.open({...})` / `.close()`, `bg-fx.js` → `BgFX.attach(el)`): quando si integra nell'app basta una chiamata, e in futuro si può chiamare `saveDay()` dentro `onSave`.
 5. **focus-demo.html**: pagina di prova isolata (foglio di lavoro del designer). Serve a validare su telefono senza toccare l'app reale.
 6. **Integrazione nell'app** (prossimo passo): linkare i 3 CSS nelle pagine, aggiungere `focus-mode.js`, aprire il Focus dal pulsante timer. Allora sì: bump `?v=N` delle pagine + `CACHE`/`CORE` in `sw.js`, come da convenzione del repo.
 
@@ -106,7 +107,24 @@ ring.style.strokeDashoffset = CIRC * (1 - progress); // progress 0→1 = riempim
 
 ---
 
-## 4. UX & accessibilità (atleta a terra)
+## 4. Background vivo — particelle + luce (`bg-fx.js`)
+
+Lo sfondo non è mai "solo nero": un canvas dedicato disegna **particelle** (8% Volt, 8% Ciano, il resto grigio `#8F95A3`) e una **luce radiale Volt con alone Ciano** che segue il puntatore (mouse o dito) con inerzia morbida. Le particelle vicine alla luce si illuminano, l'accelerano e le orbitano intorno; senza input per 3 secondi la luce **deriva da sola** (lissajous lenta), quindi anche su mobile lo sfondo è vivo. Si ferma a tab nascosta e rispetta `prefers-reduced-motion` (particelle ferme, niente derive).
+
+Attivazione (due righe, in qualsiasi pagina):
+```html
+<script src="/design/bg-fx.js"></script>
+<script>BgFX.attach(document.body, { intensity: 1, density: 1 });</script>
+```
+
+- Su un contenitore: `BgFX.attach('#fxOverlay', { intensity: 0.5, zIndex: 3 })` — **già attivo nel Focus Mode** (intensità ridotta per non disturbare la lettura a 2 metri).
+- Automatico: `BgFX.auto()` attiva tutti gli elementi con `data-bgfx="0.8"`.
+- Opzioni: `intensity` 0–1 · `density` 0.2–2 · `zIndex` · `radius` (raggio luce px). Restituisce `{ destroy() }`.
+- Performance: dpr max 2, max 150 particelle, `pointer-events:none`, pausa in background — l'effetto non tocca mai i click.
+
+---
+
+## 5. UX & accessibilità (atleta a terra)
 
 | Momento | Audio (WebAudio, square) | Vibrazione (`navigator.vibrate`) |
 |---|---|---|

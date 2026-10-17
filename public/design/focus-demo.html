@@ -11,7 +11,8 @@
 <link rel="stylesheet" href="focus.css" />
 <style>
   /* Solo regole della pagina demo */
-  body { max-width: 560px; margin: 0 auto; padding: 18px 14px calc(24px + env(safe-area-inset-bottom)); }
+  body { min-height: 100dvh; }
+  .dl-wrap { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; padding: 18px 14px calc(24px + env(safe-area-inset-bottom)); }
   .dl-head small { color: var(--text-1); letter-spacing: .18em; text-transform: uppercase; font-size: 10px; }
   .dl-head h1 { margin: 6px 0 6px; font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
   .dl-head p { color: var(--text-1); font-size: 13px; margin: 0 0 18px; }
@@ -24,10 +25,12 @@
 </style>
 </head>
 <body>
+  <main class="dl-wrap">
   <header class="dl-head">
     <small>HOME-GYM · Design Lab</small>
     <h1>Focus Mode <span style="color: var(--volt)">Cyber-Athletic</span></h1>
-    <p>Schermata B — allenamento continuo hands-free. Metrica leggibile a 2 metri, anello di progresso, bip + vibrazione.</p>
+    <p>Schermata B — allenamento continuo hands-free. Metrica leggibile a 2 metri, anello di progresso, bip + vibrazione.<br>
+    <span style="color: var(--volt)">Muovi il cursore (o il dito): la luce ti segue, le particelle ti orbitano intorno.</span></p>
   </header>
 
   <section class="card" style="margin-bottom: 14px">
@@ -66,8 +69,13 @@
     </p>
   </section>
 
+  </main>
+
+  <script src="bg-fx.js"></script>
   <script src="focus-mode.js"></script>
   <script>
+    BgFX.attach(document.body, { intensity: 1, density: 1 });
+
     const EX = {
       pushup:    { name: 'Push-up',    mode: 'reps', target: 20, unit: 'REPS', rest: 30 },
       trazioni:  { name: 'Trazioni',   mode: 'reps', target: 10, unit: 'REPS', rest: 60 },
