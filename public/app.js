@@ -91,6 +91,7 @@ async function boot() {
   if (page === 'rank') renderRankPage();
   if (page === 'stats') renderStatsPage();
   maybeShowOnboarding();
+  paintReminder();
 }
 
 /* ---------- PAGINA CLASSIFICHE GLOBALI (tutti e 4 gli esercizi) ---------- */
@@ -210,6 +211,52 @@ function inviteRoom(code, name, exercise) {
   const f = (TYPES[exercise] || {}).file || 'pushups.html';
   shareIt(`🔒 Ti sfido nella stanza "${name}" su HOME-GYM! Entra qui (serve solo un nome, zero registrazione):`, location.origin + '/' + f + '?room=' + code);
 }
+function shareWeek() {
+  const me = profile.username;
+  if (!me) { toast('👤 Prima imposta username'); return; }
+  const today = isoOf(realToday()), weekStart = isoOf(monday(realToday()));
+  const mine = mineOnlyRows();
+  const tw = mine.filter((w) => w.date >= weekStart && w.date <= today).reduce((s, w) => s + w.amount, 0);
+  const days = new Set(mine.filter((w) => w.date >= weekStart && w.date <= today).map((w) => w.date)).size;
+  shareIt(`📅 HOME-GYM · La mia settimana: ${tw.toLocaleString('it-IT')} ripetizioni in ${days} giorni 🔥. Batti questo:`, location.origin + '/index.html');
+}
+
+/* ---------- PROMEMORIA SERALE (in-app, zero infra) ---------- */
+function reminderGo() {
+  const page = document.body.dataset.page;
+  if (page === 'exercise') { const w = $('entryWorkspace'); if (w) w.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  else location.href = 'index.html#homeGrid';
+}
+function dismissReminder() {
+  try { localStorage.setItem('hg_remind', isoOf(realToday())); } catch (e) {}
+  paintReminder();
+}
+function paintReminder() {
+  const page = document.body.dataset.page;
+  const existing = $('reminderCard');
+  if (page !== 'home' && page !== 'exercise') { if (existing) existing.remove(); return; }
+  const me = profile.username;
+  const iso = isoOf(realToday());
+  let dismissed = '';
+  try { dismissed = localStorage.getItem('hg_remind') || ''; } catch (e) {}
+  const trained = me && data.some((w) => w.username === me && w.date === iso);
+  const due = !!me && !obOpen && !trained && new Date().getHours() >= 20 && dismissed !== iso;
+  if (!due) { if (existing) existing.remove(); return; }
+  if (existing) return;
+  const streak = calcStreak(me);
+  const el = document.createElement('div');
+  el.id = 'reminderCard';
+  el.className = 'card warn';
+  el.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:8px';
+  el.innerHTML = `<span style="font-size:22px">🌙</span>
+    <div style="flex:1;min-width:0"><b style="font-size:14px">Oggi non ti sei ancora allenato!</b>
+    <p class="mu" style="font-size:11px">${streak > 0 ? 'Non perdere la streak di ' + streak + ' giorni 🔥' : 'Bastano 5 minuti: scegli un esercizio e via 💪'}</p></div>
+    <button onclick="reminderGo()" class="tgo" style="border-radius:12px;padding:10px 12px;font-weight:800;font-size:12px">Allenati</button>
+    <button onclick="dismissReminder()" class="mu" style="background:none;border:0;font-size:16px;padding:6px;min-height:36px" aria-label="Chiudi promemoria">✕</button>`;
+  const banner = $('banner');
+  if (banner && banner.parentElement) banner.after(el);
+  else (($('app') || document.body)).prepend(el);
+}
 
 /* ---------- ONBOARDING primo avvio ---------- */
 let obOpen = false, obStep = 0, ob = { username: '', country: 'Italia', weekly: 1500 };
@@ -322,11 +369,29 @@ function renderStatsPage() {
   const perDay = {};
   mine.forEach((w) => { perDay[w.date] = (perDay[w.date] || 0) + w.amount; });
   const bestDay = Object.entries(perDay).reduce((b, [d, tot]) => (tot > b.tot ? { tot, d } : b), { tot: 0, d: null });
+  const prevWeekStart = isoOf(new Date(monday(realToday()).getTime() - 7 * 864e5));
+  const thisWeek = totalInRange(weekStart);
+  const prevWeek = mine.filter((w) => w.date >= prevWeekStart && w.date < weekStart).reduce((s, w) => s + w.amount, 0);
+  const deltaPct = prevWeek > 0 ? Math.round((thisWeek - prevWeek) / prevWeek * 100) : null;
+  const weekRows = mine.filter((w) => w.date >= weekStart && w.date <= today);
+  const weekDays = new Set(weekRows.map((w) => w.date)).size;
+  const weekBest = weekRows.reduce((b, w) => (w.amount > b ? w.amount : b), 0);
+  const deltaTxt = deltaPct == null
+    ? (thisWeek > 0 ? '🆕 prima settimana attiva' : '—')
+    : (deltaPct >= 0 ? `↑ +${deltaPct}%` : `↓ ${deltaPct}%`) + ' vs settimana scorsa';
+  const weekCard = `<div class="card" style="margin-top:10px">
+    <div class="row sp"><b style="font-size:15px">📅 La tua settimana</b><button onclick="shareWeek()" class="touch press glass" style="border-radius:12px;padding:8px 12px;font-size:13px" aria-label="Condividi la settimana">🚀</button></div>
+    <div class="row sp" style="margin-top:8px"><span class="mu">Volume</span><b>${thisWeek.toLocaleString('it-IT')}</b></div>
+    <div class="row sp" style="margin-top:6px"><span class="mu">Andamento</span><b>${deltaTxt}</b></div>
+    <div class="row sp" style="margin-top:6px"><span class="mu">Giorni attivi</span><b>${weekDays}/7</b></div>
+    <div class="row sp" style="margin-top:6px"><span class="mu">Record della settimana</span><b>🏆 ${weekBest.toLocaleString('it-IT')}</b></div>
+  </div>`;
   $('statsBody').innerHTML = `<div class="grid3">
       <div class="kpi"><b>${totalInRange(today)}</b><small>Oggi</small></div>
       <div class="kpi"><b>${totalInRange(weekStart)}</b><small>Settimana</small></div>
       <div class="kpi"><b>${totalInRange(monthStart)}</b><small>Mese</small></div>
     </div>
+    ${weekCard}
     <h2>🏆 Record personali</h2>
     <div class="grid3">${prCards}</div>
     <div class="card pr" style="display:flex;justify-content:space-between;align-items:center">
@@ -601,6 +666,7 @@ async function saveDay() {
   renderStats();
   renderHistory();
   paintTopbar();
+  paintReminder();
   if (!saved.some((w) => w.id < 0)) { newsToast(detectNews(previous), 'Giornata salvata ✓'); maybeCelebrate(); }
   if (button) button.disabled = false;
 }
@@ -627,7 +693,7 @@ async function postEntry(val, varOverride) {
   const before = snapshot();
   try { const r = await api('/api/workouts', { method: 'POST', body: JSON.stringify(body) }); data.unshift(fixDate(r.workout)); }
   catch (e) { console.error('POST fallita:', e); data.unshift({ id: Date.now(), ...body, created_at: new Date().toISOString() }); toast('📴 Salvato in locale: ' + e.message); }
-  renderHero(); renderGoalCard(); renderStats(); renderHistory(); paintTopbar();
+  renderHero(); renderGoalCard(); renderStats(); renderHistory(); paintTopbar(); paintReminder();
   maybeCelebrate();
   newsToast(detectNews(before), `✅ +${body.amount} · ${vv}`);
   return true;
