@@ -828,6 +828,8 @@ function renderStats() {
   const tot = rows.reduce((s, w) => s + w.amount, 0);
   const trainedDaysLabel = $('trainedDays');
   if (trainedDaysLabel) trainedDaysLabel.textContent = trainedDays;
+  const totalVolLabel = $('statsTotVol');
+  if (totalVolLabel) totalVolLabel.textContent = tot.toLocaleString('it-IT') + u;
   const kr = $('kpiRow');
   if (kr) kr.innerHTML = `<div class="kpi"><b>${rangeTotal(today)}${u}</b><small>Oggi</small></div>
     <div class="kpi"><b>${rangeTotal(weekStart)}${u}</b><small>Settimana</small></div>
@@ -839,27 +841,36 @@ function renderStats() {
       const name = w.variant || ((w.exercise || '').includes('·') ? w.exercise.split('·')[1].trim() : '?');
       sums[name] = (sums[name] || 0) + w.amount;
     });
-    avgBox.innerHTML = `<div class="row sp"><span>Totale ${esc(TYPE)}</span><b>${tot.toLocaleString('it-IT')}${u}</b></div>
-      <div class="row sp" style="margin-top:6px"><span>Media giornaliera</span><b>${(trainedDays ? tot / trainedDays : 0).toFixed(1)}${u}</b></div>` +
+    avgBox.innerHTML = `<div class="row sp"><span>Media giornaliera</span><b>${(trainedDays ? tot / trainedDays : 0).toFixed(1)}${u}</b></div>` +
       info.variants.map((name) => `<div class="row sp" style="margin-top:6px">
         <span><span class="dot" style="background:${info.accent};color:${info.accent}"></span> ${esc(variantLabel(TYPE, name))}</span>
         <span><b>${(trainedDays ? (sums[name] || 0) / trainedDays : 0).toFixed(1)}${u}</b> <span class="mu">/giorno · tot ${(sums[name] || 0).toLocaleString('it-IT')}${u}</span></span>
       </div>`).join('');
   }
-  const byV = Object.fromEntries(info.variants.map((x) => [x, { vol: 0, n: 0, pr: 0 }]));
+  const byV = Object.fromEntries(info.variants.map((x) => [x, { vol: 0, n: 0, pr: 0, d: null }]));
   data.filter((w) => (!profile.username || w.username === profile.username) && ofType(w, TYPE)).forEach((w) => {
     const vv = w.variant || ((w.exercise || '').includes('·') ? w.exercise.split('·')[1].trim() : '?');
-    if (!byV[vv]) byV[vv] = { vol: 0, n: 0, pr: 0 };
-    byV[vv].vol += w.amount; byV[vv].n++; byV[vv].pr = Math.max(byV[vv].pr, w.amount);
+    if (!byV[vv]) byV[vv] = { vol: 0, n: 0, pr: 0, d: null };
+    byV[vv].vol += w.amount; byV[vv].n++;
+    if (w.amount > byV[vv].pr) { byV[vv].pr = w.amount; byV[vv].d = w.date; }
   });
   const pg = $('prGrid');
   if (pg) pg.innerHTML = info.variants.map((x) => {
-    const r = byV[x] || { vol: 0, n: 0, pr: 0 };
+    const r = byV[x] || { vol: 0, n: 0, pr: 0, d: null };
     return `<div class="kpi pr" style="text-align:left;padding:12px 14px">
       <div class="row sp"><b>${esc(x)}</b><span style="font-weight:900;color:var(--fire)">🏆 ${r.pr}${u}</span></div>
       <p class="mu" style="font-size:11px;margin-top:2px">Vol <b style="color:var(--tx)">${r.vol}${u}</b> · Media <b style="color:var(--tx)">${(r.n ? r.vol / r.n : 0).toFixed(1)}${u}</b> · ×${r.n}</p>
+      <div class="when" style="margin-top:3px">${r.d ? 'max serie · ' + fmtLong(r.d) : 'nessuna serie'}</div>
       <div class="pbar" style="margin-top:6px"><i style="width:${r.pr ? 100 : 0}%"></i></div></div>`;
   }).join('');
+  const perDay = {};
+  rows.forEach((w) => { perDay[w.date] = (perDay[w.date] || 0) + w.amount; });
+  const bestDay = Object.entries(perDay).reduce((b, [d, tv]) => (tv > b.tot ? { tot: tv, d } : b), { tot: 0, d: null });
+  const bestDayBox = $('prBestDay');
+  if (bestDayBox) bestDayBox.innerHTML = bestDay.tot ? `<div class="card pr" style="display:flex;justify-content:space-between;align-items:center">
+    <div><b style="font-size:22px">${bestDay.tot.toLocaleString('it-IT')}${u}</b>
+      <div class="when">miglior giornata${bestDay.d ? ' · ' + fmtDate(bestDay.d) : ''}</div></div>
+    <span style="font-size:30px">🔥</span></div>` : '';
   renderTrend();
   renderAch();
 }
