@@ -90,6 +90,7 @@ async function boot() {
   if (page === 'exercise') renderExercisePage();
   if (page === 'rank') renderRankPage();
   if (page === 'stats') renderStatsPage();
+  maybeShowOnboarding();
 }
 
 /* ---------- PAGINA CLASSIFICHE GLOBALI (tutti e 4 gli esercizi) ---------- */
@@ -138,6 +139,7 @@ async function renderHome() {
   if (ss) ss.innerHTML = `<span style="font-size:26px">🔥</span>
     <div style="flex:1"><p style="font-weight:800">${calcStreak(me || null)} giorni di fila</p>
     <p class="mu" style="font-size:11px">${me ? '@' + esc(me) + ' · ' : ''}oggi: ${todayTot} · target ${goal}</p></div>
+    <button id="homeShareBtn" onclick="shareSummary()" class="touch press glass" style="border-radius:14px;padding:10px 14px;font-size:15px" aria-label="Condividi i tuoi numeri">🚀</button>
     <a href="profile.html" class="touch press glass" style="border-radius:14px;padding:10px 14px;font-size:12px;font-weight:800;text-decoration:none;color:inherit">👤</a>`;
   renderHomeStatsSub(me);
   const hg = $('homeGrid');
@@ -160,7 +162,8 @@ async function renderHome() {
       const f = (TYPES[x.exercise] || {}).file || 'pushups.html';
       return `<a href="${f}?room=${esc(x.code)}" class="card cardlink" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:8px">
         <span>🔒</span><span style="flex:1;min-width:0"><b>${esc(x.name)}</b> <span class="mu" style="font-size:12px">${esc(x.code)} · ${esc(x.exercise)}</span></span>
-        <span class="mu" style="font-size:12px">👥${x.members}</span></a>`;
+        <span class="mu" style="font-size:12px">👥${x.members}</span>
+        <button onclick="event.preventDefault();event.stopPropagation();inviteRoom('${esc(x.code)}','${esc(x.name)}','${esc(x.exercise)}')" class="touch press glass" style="border-radius:12px;padding:8px 12px;font-size:14px" aria-label="Invita amici nella stanza">📤</button></a>`;
     }).join('') : '<p class="mu" style="font-size:12px">Nessuna stanza — creane una dalla scheda Rank del tuo esercizio! 🔒</p>';
   } catch (e) { $('roomsHome').innerHTML = '<p class="mu" style="font-size:12px">Stanze non disponibili offline.</p>'; }
 }
@@ -172,6 +175,102 @@ function renderHomeStatsSub(me) {
   sub.textContent = me
     ? `@${me} · 🔥${calcStreak(me)}gg · target ${goal}/giorno`
     : 'Streak · volumi · PR · medie';
+}
+
+/* ---------- CONDIVISIONE (Web Share nativo + fallback copia) ---------- */
+function shareIt(text, url) {
+  const full = text + '\n' + url;
+  if (navigator.share) {
+    try { navigator.share({ title: 'HOME-GYM 💪', text, url }).catch(() => {}); return; } catch (e) {}
+  }
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(full).then(() => toast('🔗 Copiato! Incollalo dove vuoi')).catch(() => { try { prompt('Copia e incolla:', full); } catch (e2) {} });
+  } else { try { prompt('Copia e incolla:', full); } catch (e2) {} }
+}
+function mineOnlyRows() { const me = profile.username; return me ? data.filter((w) => w.username === me) : []; }
+function shareSummary() {
+  const me = profile.username;
+  if (!me) { toast('👤 Prima imposta username'); return; }
+  const iso = isoOf(realToday());
+  const mine = mineOnlyRows();
+  const todayTot = mine.filter((w) => w.date === iso).reduce((s, w) => s + w.amount, 0);
+  const tot = mine.reduce((s, w) => s + w.amount, 0);
+  shareIt(`💪 HOME-GYM · 🔥 ${calcStreak(me)} giorni di fila · oggi ${todayTot} · totale ${tot.toLocaleString('it-IT')}. Sfidami, è gratis:`, location.origin + '/index.html');
+}
+function shareRank() {
+  const me = profile.username;
+  if (!me) { toast('👤 Prima imposta username'); return; }
+  const i = rank.rows.findIndex((x) => x.username === me);
+  const scopeTxt = rank.scope === 'room' ? `nella stanza "${rank.roomName || rank.room}"` : rank.scope === 'country' ? `in ${profile.country || 'Italia'}` : 'tra tutti gli atleti';
+  const mTxt = rank.metric === 'pr' ? 'serie record' : rank.metric === 'streak' ? 'giorni di streak' : 'volume';
+  const posTxt = i >= 0 ? `Sono ${i + 1}° su ${rank.rows.length} (${mTxt}) ${scopeTxt}` : `Sto scalando la classifica ${scopeTxt} (${mTxt})`;
+  shareIt(`🏆 HOME-GYM · ${posTxt}. Entra anche tu:`, location.origin + '/index.html');
+}
+function inviteRoom(code, name, exercise) {
+  const f = (TYPES[exercise] || {}).file || 'pushups.html';
+  shareIt(`🔒 Ti sfido nella stanza "${name}" su HOME-GYM! Entra qui (serve solo un nome, zero registrazione):`, location.origin + '/' + f + '?room=' + code);
+}
+
+/* ---------- ONBOARDING primo avvio ---------- */
+let obOpen = false, obStep = 0, ob = { username: '', country: 'Italia', weekly: 1500 };
+function maybeShowOnboarding() {
+  if (profile.username) return;
+  if (document.body.dataset.page === 'profile') return;
+  try { if (localStorage.getItem('hg_onboarded') === '1') return; } catch (e) {}
+  obOpen = true; obStep = 0; renderOnboarding();
+}
+function renderOnboarding() {
+  let root = $('obRoot');
+  if (!root) { root = document.createElement('div'); root.id = 'obRoot'; document.body.appendChild(root); }
+  if (!obOpen) { root.innerHTML = ''; document.body.style.overflow = ''; return; }
+  document.body.style.overflow = 'hidden';
+  const step0 = `
+    <div class="grab"></div>
+    <div style="text-align:center;font-size:42px;margin:6px 0 0">💪</div>
+    <h2 style="text-align:center;font-size:23px;margin:6px 0 2px">Benvenuto in <span class="glow-lime">HOME-GYM</span></h2>
+    <p class="sub" style="text-align:center">Calistenics a casa · gratis · cloud + offline</p>
+    <p style="font-weight:800;font-size:14px;margin:16px 0 6px">Come ti chiami nell'arena?</p>
+    <input id="obUser" maxlength="24" placeholder="Username (es. Matteo)" style="width:100%;font-weight:800;min-height:52px;font-size:17px" aria-label="Username" />
+    <p class="mu" style="font-size:11px;margin-top:8px">Con questo nome appari nelle classifiche e nelle stanze con gli amici. Niente email, niente password.</p>
+    <button class="pri" style="margin-top:14px" onclick="obNext()">Avanti →</button>
+    <button onclick="skipOnboarding()" class="mu" style="display:block;width:100%;text-align:center;font-size:12px;text-decoration:underline;background:none;border:0;min-height:44px">Salta per ora</button>`;
+  const step1 = `
+    <div class="grab"></div>
+    <h2 style="text-align:center;font-size:22px;margin:8px 0 2px">Ultimo passo 🎯</h2>
+    <p class="mu" style="text-align:center;font-size:12px">Personalizzo la sfida per te</p>
+    <p style="font-weight:800;font-size:14px;margin:16px 0 6px">Il tuo paese (per la classifica nazionale)</p>
+    <select id="obCountry" style="width:100%;min-height:50px" aria-label="Paese">${COUNTRIES.map((c) => `<option ${c === ob.country ? 'selected' : ''}>${c}</option>`).join('')}</select>
+    <p style="font-weight:800;font-size:14px;margin:16px 0 6px">Obiettivo settimanale (ripetizioni)</p>
+    <div class="chips">${[500, 1500, 3000].map((g) => `<button id="obG${g}" class="chipbtn ${ob.weekly === g ? 'on' : ''}" onclick="obGoal(${g})">${g}</button>`).join('')}</div>
+    <button class="pri" style="margin-top:16px" onclick="obDone()">Inizia 💪</button>
+    <button onclick="obBack()" class="mu" style="display:block;width:100%;text-align:center;font-size:12px;text-decoration:underline;background:none;border:0;min-height:44px">‹ Indietro</button>`;
+  root.innerHTML = `<div class="sheet-wrap open" id="obWrap"><div class="backdrop" onclick="skipOnboarding()"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Benvenuto">${obStep === 0 ? step0 : step1}</div></div>`;
+}
+function obNext() {
+  const v = ($('obUser').value || '').trim().slice(0, 24);
+  if (v.length < 3) return toast('❌ Username: almeno 3 caratteri');
+  ob.username = v; obStep = 1; renderOnboarding();
+}
+function obBack() { obStep = 0; renderOnboarding(); }
+function obGoal(g) {
+  ob.weekly = g;
+  [500, 1500, 3000].forEach((x) => { const b = $('obG' + x); if (b) b.classList.toggle('on', x === g); });
+}
+async function obDone() {
+  if (!ob.username) { obStep = 0; renderOnboarding(); return; }
+  ob.country = ($('obCountry') || {}).value || 'Italia';
+  profile = { ...profile, username: ob.username, name: ob.username, country: ob.country, weekly_goal: ob.weekly };
+  try { localStorage.setItem('hg_p', JSON.stringify(profile)); } catch (e) {}
+  try { const r = await api('/api/workouts?type=profile', { method: 'POST', body: JSON.stringify(profile) }); if (r.profile) profile = r.profile; } catch (e) {}
+  try { localStorage.setItem('hg_onboarded', '1'); } catch (e) {}
+  obOpen = false; renderOnboarding();
+  toast('🎉 Benvenuto @' + profile.username + ' — si comincia!');
+  boot();
+}
+function skipOnboarding() {
+  try { localStorage.setItem('hg_onboarded', '1'); } catch (e) {}
+  obOpen = false; renderOnboarding();
 }
 
 /* Formato date compatto (come PUSH-UP): "17 ott" e "sab 17 ott 2026" */
@@ -1078,6 +1177,11 @@ async function loadRank() {
   box.innerHTML = (rank.rows.length ? rank.rows.map((r, i) => rankRow(r, i, rank.metric)).join('')
       : '<p class="mu" style="text-align:center;padding:16px 0;font-size:13px">Nessuno qui — sii il primo! 🚀</p>');
   const lab = $('rankLabel'); if (lab) lab.textContent = `${mLabel} · ${ex}`;
+  if (lab && profile.username) {
+    let sb = $('rankShareBtn');
+    if (!sb) { sb = document.createElement('button'); sb.id = 'rankShareBtn'; sb.className = 'touch press glass'; sb.style.cssText = 'width:100%;margin:2px 0 8px;border-radius:12px;padding:10px;font-weight:800;font-size:13px'; sb.textContent = '🚀 Sfida gli amici — condividi HOME-GYM'; lab.after(sb); }
+    sb.onclick = shareRank;
+  }
   if (rank.scope === 'room') loadRoomPanel();
 }
 function localRank(exercise) {
@@ -1131,12 +1235,13 @@ async function loadRoomPanel() {
   }
   try {
     const r = await api('/api/workouts?type=room&code=' + encodeURIComponent(rank.room));
+    rank.roomName = r.room.name;
     const mine = (r.members || []).some((m) => m.username === profile.username);
     box.innerHTML = `<div class="card roombox">
       <p style="font-weight:800">🔒 ${esc(r.room.name)} <span class="mu" style="font-size:12px">${esc(r.room.code)} · 👥${r.members.length}</span></p>
       <p class="mu" style="font-size:11px">Membri: ${(r.members || []).map((m) => esc(m.username)).join(', ') || '—'}</p>
       <div class="row" style="margin-top:8px">
-        <button onclick="copyRoomLink()" class="tgo" style="flex:1;border:0;border-radius:12px;font-weight:800;font-size:14px">🔗 Copia link invito</button>
+        <button onclick="copyRoomLink()" class="tgo" style="flex:1;border:0;border-radius:12px;font-weight:800;font-size:14px">📤 Invita amici</button>
         ${mine ? '' : `<button onclick="joinRoom()" style="flex:1;font-size:14px">➕ Unisciti</button>`}
       </div>
       <button onclick="leaveRoom()" class="mu" style="font-size:11px;text-decoration:underline;background:none;border:0;min-height:32px;padding:4px 0">Esci dalla stanza / cambia codice</button></div>`;
@@ -1176,10 +1281,8 @@ function leaveRoom() {
   paintRankSeg(); loadRoomPanel(); loadRank();
 }
 function copyRoomLink() {
-  const link = roomLink(rank.room);
-  const done = () => toast('🔗 Link copiato! Invialo agli amici');
-  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(link).then(done).catch(() => prompt('Copia il link:', link));
-  else prompt('Copia il link:', link);
+  // Prima il foglio di condivisione nativo (mobile), fallback copia link
+  shareIt(`🔒 Ti sfido nella stanza "${rank.roomName || rank.room}" su HOME-GYM! Entra qui:`, roomLink(rank.room));
 }
 
 /* ---------- PROFILO ---------- */
