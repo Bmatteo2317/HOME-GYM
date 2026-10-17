@@ -50,9 +50,10 @@
     <div id="prBestDay"></div>
     <h2>Medie · <span id="trainedDays">0</span> giorni allenati · tot <span id="statsTotVol">0</span></h2>
     <div class="card" id="exerciseAverages"></div>
-    <h2>📈 Andamento</h2>
-    <div class="card"><div class="chart-head"><b>📈 Grafico</b><div class="chips"><button class="chipbtn" data-cr="7d" onclick="setChartRange('7d')">7G</button><button class="chipbtn" data-cr="14d" onclick="setChartRange('14d')">14G</button><button class="chipbtn" data-cr="30d" onclick="setChartRange('30d')">30G</button><button class="chipbtn" data-cr="1y" onclick="setChartRange('1y')">1A</button></div></div><p class="mu" id="chartSub" style="font-size:11px">Ultimi 14 giorni</p><div id="chartSvg"></div></div>
-    <div class="card"><b>Andamento settimanale</b><div id="weekSvg" style="margin-top:8px"></div><div class="row sp" id="trendBadge" style="margin-top:10px"></div></div>
+    <h2>Ultimi 14 giorni</h2>
+    <div class="card"><div id="chartSvg"></div></div>
+    <h2>Andamento settimanale</h2>
+    <div class="card"><div id="weekSvg"></div><div class="row sp" id="trendBadge" style="margin-top:12px"></div></div>
   </div>
 
   <div id="sub-goals" class="subtab">
@@ -94,6 +95,6 @@
 <div id="toast"></div>
 <div id="sheetRoot"></div>
 <canvas id="confetti"></canvas>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

@@ -841,27 +841,23 @@ function renderStats() {
       const name = w.variant || ((w.exercise || '').includes('·') ? w.exercise.split('·')[1].trim() : '?');
       sums[name] = (sums[name] || 0) + w.amount;
     });
-    avgBox.innerHTML = `<div class="row sp"><span>Media giornaliera</span><b>${(trainedDays ? tot / trainedDays : 0).toFixed(1)}${u}</b></div>` +
-      info.variants.map((name) => `<div class="row sp" style="margin-top:6px">
+    avgBox.innerHTML = `<div class="kv"><span>Media giornaliera</span><b>${(trainedDays ? tot / trainedDays : 0).toFixed(1)}${u}</b></div>` +
+      info.variants.map((name) => `<div class="kv">
         <span><span class="dot" style="background:${info.accent};color:${info.accent}"></span> ${esc(variantLabel(TYPE, name))}</span>
         <span><b>${(trainedDays ? (sums[name] || 0) / trainedDays : 0).toFixed(1)}${u}</b> <span class="mu">/giorno · tot ${(sums[name] || 0).toLocaleString('it-IT')}${u}</span></span>
       </div>`).join('');
   }
-  const byV = Object.fromEntries(info.variants.map((x) => [x, { vol: 0, n: 0, pr: 0, d: null }]));
+  const prByV = Object.fromEntries(info.variants.map((x) => [x, { v: 0, d: null }]));
   data.filter((w) => (!profile.username || w.username === profile.username) && ofType(w, TYPE)).forEach((w) => {
     const vv = w.variant || ((w.exercise || '').includes('·') ? w.exercise.split('·')[1].trim() : '?');
-    if (!byV[vv]) byV[vv] = { vol: 0, n: 0, pr: 0, d: null };
-    byV[vv].vol += w.amount; byV[vv].n++;
-    if (w.amount > byV[vv].pr) { byV[vv].pr = w.amount; byV[vv].d = w.date; }
+    if (!prByV[vv]) prByV[vv] = { v: 0, d: null };
+    if (w.amount > prByV[vv].v) { prByV[vv].v = w.amount; prByV[vv].d = w.date; }
   });
   const pg = $('prGrid');
   if (pg) pg.innerHTML = info.variants.map((x) => {
-    const r = byV[x] || { vol: 0, n: 0, pr: 0, d: null };
-    return `<div class="kpi pr" style="text-align:left;padding:12px 14px">
-      <div class="row sp"><b>${esc(x)}</b><span style="font-weight:900;color:var(--fire)">🏆 ${r.pr}${u}</span></div>
-      <p class="mu" style="font-size:11px;margin-top:2px">Vol <b style="color:var(--tx)">${r.vol}${u}</b> · Media <b style="color:var(--tx)">${(r.n ? r.vol / r.n : 0).toFixed(1)}${u}</b> · ×${r.n}</p>
-      <div class="when" style="margin-top:3px">${r.d ? 'max serie · ' + fmtLong(r.d) : 'nessuna serie'}</div>
-      <div class="pbar" style="margin-top:6px"><i style="width:${r.pr ? 100 : 0}%"></i></div></div>`;
+    const r = prByV[x] || { v: 0, d: null };
+    return `<div class="kpi pr"><b>${r.v ? r.v + u : '—'}</b><small>${esc(variantLabel(TYPE, x))}</small>
+      <div class="when">${r.d ? 'max serie · ' + fmtLong(r.d) : 'nessuna serie'}</div></div>`;
   }).join('');
   const perDay = {};
   rows.forEach((w) => { perDay[w.date] = (perDay[w.date] || 0) + w.amount; });
