@@ -1,13 +1,17 @@
-# Push-Up Tracker — Vercel + Neon
+# HOME-GYM — Calistenica a casa · Vercel + Neon
 
-App statica (`index.html`) + Serverless API (`/api/workouts`) + Postgres su Neon.
+PWA multi-pagina (`public/`) + una singola Serverless API (`/api/workouts`) + Postgres su Neon.
+Quattro miniapp (💪 Flessioni, 🔥 Addominali, ⏱️ Plank, 🧗 Trazioni) con streak, volumi, PR,
+obiettivi giornalieri intelligenti, classifica globale (cloud) e stanze private tra amici.
 
 ## 1. Crea il database Neon
 
 1. Vai su https://neon.tech → New Project (region vicina, es. EU West).
 2. Apri **SQL Editor** e incolla il contenuto di `schema.sql` → Run.
+   Crea le tabelle `workouts`, `profile`, `rooms`, `room_members` (sicuro da rieseguire).
 3. Vai su **Connect** → copia la **pooled connection string**, es:
    `postgresql://user:pass@ep-xxx-pooler.eu-west-1.aws.neon.tech/dbname?sslmode=require`
+   (quella *pooled* è importante: l'app usa il driver `pg` in serverless).
 
 ## 2. Deploy su Vercel
 
@@ -26,7 +30,7 @@ vercel --prod
 
 Oppure da Dashboard Vercel:
 - **Settings → Environment Variables** → `DATABASE_URL` = connection string Neon (tutti gli env: Production, Preview, Development).
-- Oppure usa l'integrazione ufficiale: **Storage → Connect → Neon**.
+- **Senza redeploy la variabile non viene applicata.**
 
 ## 3. Test locale
 
@@ -40,44 +44,56 @@ vercel dev
 ## Struttura
 
 ```
-index.html          → frontend (fetch /api/workouts, fallback localStorage offline)
+public/                 → frontend servito alla radice (output directory Vercel)
+  index.html            → Home: volume di oggi, griglia esercizi, stanze
+  pushups.html          → Flessioni   (subtab: Inserisci · Stats · Obiettivi · Rank · Storico)
+  abs.html              → Addominali
+  plank.html            → Plank (in secondi)
+  pullups.html          → Trazioni
+  stats.html            → Statistiche generali dell'atleta
+  profile.html          → Profilo: username, stato, obiettivo giornaliero
+  rank.html             → Classifiche: tutti e 4 gli esercizi + filtro per variante
+  app.js / app.css      → logica UX e stile condivisi (versione ?v=N per cache busting)
+  sw.js                 → service worker (offline + installabile)
+  manifest.webmanifest  → PWA
 api/
-  db.js             → client @neondatabase/serverless + validazioni
-  workouts.js       → GET/POST/DELETE allenamenti
-schema.sql          → tabella workouts su Neon
-package.json        → dipendenza @neondatabase/serverless
-vercel.json         → runtime nodejs22.x per /api
-pushup-tracker.html → originale (solo localStorage, tenuto per riferimento)
+  workouts.js           → tutte le API (/api/workouts?type=...) con client pg
+schema.sql              → tabelle su Neon (workouts, profile, rooms, room_members)
+vercel.json             → header per sw.js e manifest
 ```
 
-## API
+## API (`/api/workouts`)
 
-- `GET /api/workouts` → `{ "2026-09-01": {wide:[20,15], close:[10], diamond:[]} }`
-- `POST /api/workouts` body `{date:"YYYY-MM-DD", entry:{wide:[],close:[],diamond:[]}}` → upsert (totale 0 = cancella)
-- `DELETE /api/workouts?date=YYYY-MM-DD` → cancella giornata
-- `GET /api/health` → diagnostica `{ ok, databaseUrlConfigured, tableExists, count, error }`
+- `GET  /api/workouts` → tutte le serie (le pagine filtrano per username)
+- `POST /api/workouts` body `{category, variant, amount, unit, date, username, country}` → singola serie
+- `PATCH /api/workouts?id=N` body `{date:"YYYY-MM-DD"}` → sposta una serie (usato da ✏️ Data nello Storico)
+- `DELETE /api/workouts?id=N` → cancella una serie
+- `POST /api/workouts?type=day` body `{category, date, username, country, entries:[{variant, amount}]}` →
+  salva l'intera giornata (sostituisce le serie di quella categoria/data; `entries: []` svuota la giornata)
+- `GET/POST /api/workouts?type=profile` → profilo unico (id=1)
+- `GET  /api/workouts?type=leaderboard&scope=global|country&country=&period=today|week|all&metric=volume|pr|streak&exercise=&room=` → top 50
+- `GET  /api/workouts?type=rooms` · `POST type=rooms {name, exercise, username, country}` → crea stanza
+- `POST /api/workouts?type=room_join {code, username, country}` · `GET type=room&code=` → stanza + membri
+- `GET  /api/workouts?type=schema` → diagnostica (colonne reali, conteggi, ultime righe)
 
-Il frontend mostra **"Connesso a Neon ☁️"** oppure **"Offline — uso dati locali"** se `DATABASE_URL` manca o il DB non risponde.
+Il frontend mostra i dati cloud e, se `/api` non risponde, ripiega su `localStorage`
+(avviso arancione in Home con il pulsante "Riprova").
 
 ## I dati non si salvano su Neon? Checklist
 
-L'app ora mostra un **avviso arancione con la causa esatta** direttamente in Home. Le cause più comuni:
+1. **`DATABASE_URL non configurata`** → Vercel Dashboard → Settings → Environment Variables →
+   aggiungi `DATABASE_URL` (pooled di Neon) per Production + Preview + Development → **redeploy**.
+2. **Tabella mancante** (`relation "workouts" does not exist`) → Neon Dashboard → SQL Editor →
+   incolla `schema.sql` → Run.
+3. **Stai aprendo i file HTML come `file://...`** → le `/api` non esistono: apri l'URL Vercel o `vercel dev`.
+4. **Test rapido**: apri `https://TUO-APP.vercel.app/api/workouts?type=schema` — mostra se le tabelle
+   esistono, quante righe ci sono e le ultime serie salvate.
 
-1. **`DATABASE_URL non configurata`** → Vercel Dashboard → Project → Settings → Environment Variables → aggiungi `DATABASE_URL` (connection string *pooled* di Neon) per Production + Preview + Development → **redeploy** (senza redeploy la variabile non viene applicata).
-2. **Tabella mancante** (`relation "workouts" does not exist`) → Neon Dashboard → SQL Editor → incolla `schema.sql` → Run.
-3. **Stai aprendo `index.html` come file locale** (`file://...`) → le `/api` non esistono: apri l'URL Vercel oppure `vercel dev` in locale.
-4. **Test rapido**: apri nel browser `https://TUO-APP.vercel.app/api/health` — ti dice se manca la variabile, la tabella, o quante righe ci sono (`count`).
+## Note tecniche
 
-Dopo aver salvato almeno una giornata con ☁️, verifica su Neon: SQL Editor → `SELECT * FROM workouts;`
-
-## Classifica community 🌍 (v2, opt-in anonimo)
-
-I dati personali (serie, giorni, obiettivi) restano **solo in `localStorage`**. Sul cloud finiscono
-solo aggregati anonimi, e solo se l'utente entra in classifica dal tab **Rank**.
-
-- Tabella: `community_stats` (in `schema.sql` — rieseguilo nel SQL Editor di Neon per crearla)
-- `POST /api/publish` → upsert anonimo `{user_id, nickname, pb, totalAll, daysTrained, weekTotal, streakCur}`
-  (pubblicato in fire-and-forget a ogni salvataggio, senza rallentare l'app)
-- `GET /api/leaderboard?by=day|week|total|streak&user_id=...&limit=10` → top-10 + rank/percentili
-- Frontend: tab Rank con opt-in, nickname, 4 card percentile ("superi il P%"), top-10 per metrica,
-  posizione personale e cache locale quando offline
+- Il frontend usa `app.js?v=N`: **alza N in tutte le pagine HTML e in `CORE` di `sw.js` quando modifichi
+  `app.js`** (e alza anche `CACHE` in `sw.js`), altrimenti il service worker può servire la versione vecchia.
+- Il timer di recupero (30/60/90/120s) vive nella scheda Inserisci di ogni esercizio.
+- Gli obiettivi giornalieri per esercizio sono **locali** (`localStorage: hg_goal_<categoria>`):
+  Auto = mediana degli ultimi 7 giorni allenati +10%, oppure Manuale.
+- La classifica usa solo `username` + `country` del Profilo: nessun dato personale extra.

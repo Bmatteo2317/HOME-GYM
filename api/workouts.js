@@ -1,9 +1,10 @@
 // api/workouts.js — Vercel Serverless + Neon (multi-pagina + stanze private)
-// Workouts: GET /api/workouts · POST /api/workouts · DELETE /api/workouts?id=
+// Workouts: GET /api/workouts · POST /api/workouts · PATCH /api/workouts?id= · DELETE /api/workouts?id=
 // Leaderboard: GET /api/workouts?type=leaderboard&scope=global|country&country=&period=today|week|all&metric=volume|pr|streak&exercise=&room=CODE
 // Stanze: GET /api/workouts?type=rooms · POST type=rooms {name, exercise, username, country}
 //         POST type=room_join {code, username, country} · GET type=room&code=
 // Profilo: GET/POST /api/workouts?type=profile
+// Diagnostica: GET /api/workouts?type=schema
 
 const crypto = require('crypto');
 const { Pool } = require('pg');
@@ -20,7 +21,9 @@ function send(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+let schemaReady = false;
 async function ensureSchema(client) {
+  if (schemaReady) return; // già verificato in questa istanza calda
   await client.query(`
     CREATE TABLE IF NOT EXISTS workouts (
       id SERIAL PRIMARY KEY,
@@ -101,11 +104,12 @@ async function ensureSchema(client) {
       PRIMARY KEY (room_code, username)
     );
   `);
+  schemaReady = true;
 }
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return send(res, 200, { ok: true });
   const type = (req.query && req.query.type) || 'workouts';
@@ -309,6 +313,20 @@ module.exports = async (req, res) => {
          String(body.username || '').slice(0, 30), String(body.country || '').slice(0, 40)]
       );
       return send(res, 201, { workout: rows[0] });
+    }
+    if (req.method === 'PATCH') {
+      // Sposta una serie salvata su un'altra data (usato da ✏️ Data nello Storico)
+      const id = parseInt(req.query.id, 10);
+      if (!Number.isFinite(id)) return send(res, 400, { error: 'id non valido' });
+      const date = String(body.date || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(date + 'T00:00:00Z').toISOString().slice(0, 10) !== date) {
+        return send(res, 400, { error: 'data non valida' });
+      }
+      const utcTomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+      if (date > utcTomorrow) return send(res, 400, { error: 'Non puoi registrare nel futuro' });
+      const { rows } = await client.query('UPDATE workouts SET date=$1 WHERE id=$2 RETURNING *', [date, id]);
+      if (!rows.length) return send(res, 404, { error: 'serie non trovata' });
+      return send(res, 200, { workout: rows[0] });
     }
     if (req.method === 'DELETE') {
       const id = parseInt(req.query.id, 10);

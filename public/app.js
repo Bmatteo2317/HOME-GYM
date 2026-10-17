@@ -347,6 +347,14 @@ function addDraftSet(v) {
   const inputs = [...document.querySelectorAll('[data-draft-variant]')].filter((input) => input.dataset.draftVariant === v);
   if (inputs.length) inputs[inputs.length - 1].focus();
 }
+function syncEntryGoal() {
+  const goalFill = $('g-fill-entry'), goalText = $('g-txt-entry');
+  if (!goalFill || !goalText) return;
+  const dayTotal = Object.values(entryDraft).flat().reduce((sum, row) => sum + row.amount, 0);
+  const g = currentGoal();
+  goalFill.style.width = Math.min(100, Math.round(dayTotal / g * 100)) + '%';
+  goalText.innerHTML = `<b>${dayTotal}</b> / ${g}`;
+}
 function setDraftValue(v, index, value) {
   const parsed = value === '' ? 0 : Number(value);
   entryDraft[v][index].amount = Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
@@ -355,12 +363,14 @@ function setDraftValue(v, index, value) {
   if (total) total.textContent = dayTotal;
   const heroTotal = $('draftHeroTotal');
   if (heroTotal) heroTotal.textContent = dayTotal + (TYPES[TYPE].unit === 'seconds' ? 's' : '');
+  syncEntryGoal();
   const variantTotal = $('draft-total-' + TYPES[TYPE].variants.indexOf(v));
   if (variantTotal) variantTotal.textContent = entryDraft[v].reduce((sum, row) => sum + row.amount, 0);
 }
 function deleteDraftSet(v, index) {
   entryDraft[v].splice(index, 1);
   renderEntry();
+  syncEntryGoal();
 }
 function updSelInfo() {
   const s = $('selInfo'); if (!s || !TYPE) return;
@@ -387,6 +397,9 @@ function renderEntry() {
     <div class="card"><div class="row sp"><span class="mu">Totale giornata</span><b><span id="draftDayTotal">${total}</span> ${unitShort}</b></div>
       <p class="mu" style="font-size:12px;margin-top:4px">Registra le serie per ogni variante, poi salva la giornata.</p>
     </div>
+    <div class="card" id="goalCard"></div>
+    <p id="streakLine" class="sub"></p>
+    <div class="card" id="timerCard"></div>
     ${info.variants.map((v, variantIndex) => {
       const sets = entryDraft[v];
       const variantTotal = sets.reduce((sum, row) => sum + row.amount, 0);
@@ -407,6 +420,8 @@ function renderEntry() {
     <div class="savebar"><button class="pri" id="saveDayButton" onclick="saveDay()">💾 Salva giornata</button></div>`;
   const dateInput = workspace.querySelector('input[type="date"]');
   if (dateInput) dateInput.style.cssText = 'flex:1;text-align:center;color-scheme:dark;min-height:50px';
+  renderGoalCard();
+  renderTimer();
 }
 async function saveDay() {
   if (!profile.username) {
@@ -460,7 +475,7 @@ async function saveDay() {
   renderStats();
   renderHistory();
   paintTopbar();
-  if (!saved.some((w) => w.id < 0)) newsToast(detectNews(previous), 'Giornata salvata ✓');
+  if (!saved.some((w) => w.id < 0)) { newsToast(detectNews(previous), 'Giornata salvata ✓'); maybeCelebrate(); }
   if (button) button.disabled = false;
 }
 function renderHero() {
@@ -701,6 +716,7 @@ function sheetConfirm() {
   entryDraft[selectedVariant].push({ id: null, amount: sheet.val });
   closeSheet();
   renderEntry();
+  syncEntryGoal();
   toast('✅ Serie aggiunta alla giornata');
 }
 function shT(e) { sheet.touchY = e.touches[0].clientY; }
@@ -929,9 +945,15 @@ async function editEntryDate(id) {
   const w = data.find((x) => x.id === id);
   if (!w) return;
   const v = prompt('Nuova data (AAAA-MM-GG):', w.date);
-  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+  if (!v) return;
+  const parsed = new Date(v + 'T00:00:00');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(parsed.getTime()) || isoOf(parsed) !== v) {
+    toast('❌ Data non valida (usa AAAA-MM-GG)');
+    return;
+  }
   try { await api('/api/workouts?id=' + id, { method: 'PATCH', body: JSON.stringify({ date: v }) }); w.date = v; }
-  catch (e) { w.date = v; toast('📴 Data aggiornata in locale'); }
+  catch (e) { w.date = v; toast('📴 Data aggiornata solo in locale: ' + e.message); }
+  try { localStorage.setItem('hg_w', JSON.stringify(data)); } catch (e) {}
   renderHero(); renderGoalCard(); renderStats(); renderHistory();
 }
 /* ---------- Backup locale (export/import JSON) ---------- */
