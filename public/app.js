@@ -1513,6 +1513,8 @@ document.addEventListener('input', (e) => {
   }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheet.open) closeSheet(); });
+/* ---------- Background vivo: puntini bianchi + luce che segue il mouse ---------- */
+if (typeof BgFX !== 'undefined') BgFX.attach(document.body, { intensity: 0.9, zIndex: 10 });
 /* ---------- PWA: registra service worker ---------- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

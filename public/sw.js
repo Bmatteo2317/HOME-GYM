@@ -1,10 +1,10 @@
 /* HOME-GYM service worker — offline + installabile */
-const CACHE = 'home-gym-v19';
+const CACHE = 'home-gym-v20';
 const CORE = [
   '/index.html',
   '/',
   '/app.css?v=4',
-  '/app.js?v=18',
+  '/app.js?v=19',
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png',
@@ -15,7 +15,8 @@ const CORE = [
   '/pullups.html',
   '/profile.html',
   '/rank.html',
-  '/stats.html'
+  '/stats.html',
+  '/design/bg-fx.js?v=2'
 ];
 
 self.addEventListener('install', (e) => {
