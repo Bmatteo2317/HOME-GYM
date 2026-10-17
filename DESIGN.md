@@ -109,7 +109,7 @@ ring.style.strokeDashoffset = CIRC * (1 - progress); // progress 0→1 = riempim
 
 ## 4. Background vivo — particelle + luce (`bg-fx.js`)
 
-Lo sfondo non è mai "solo nero": un canvas dedicato disegna **particelle** (8% Volt, 8% Ciano, il resto grigio `#8F95A3`) e una **luce radiale Volt con alone Ciano** che segue il puntatore (mouse o dito) con inerzia morbida. Le particelle vicine alla luce si illuminano, l'accelerano e le orbitano intorno; senza input per 3 secondi la luce **deriva da sola** (lissajous lenta), quindi anche su mobile lo sfondo è vivo. Si ferma a tab nascosta e rispetta `prefers-reduced-motion` (particelle ferme, niente derive).
+Lo sfondo non è mai "solo nero": un canvas dedicato disegna **puntini bianchi** (`#FFFFFF`) e una **luce bianca soffusa, molto debole**, che segue il puntatore (mouse o dito) con inerzia morbida. Le particelle vicine alla luce si illuminano, l'accelerano e le orbitano intorno; senza input per 3 secondi la luce **deriva da sola** (lissajous lenta), quindi anche su mobile lo sfondo è vivo. Si ferma a tab nascosta e rispetta `prefers-reduced-motion` (particelle ferme, niente derive).
 
 Attivazione (due righe, in qualsiasi pagina):
 ```html

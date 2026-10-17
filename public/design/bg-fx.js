@@ -16,11 +16,7 @@ const BgFX = (() => {
   'use strict';
 
   const DEFAULTS = { intensity: 1, density: 1, zIndex: 40, radius: 300 };
-  const RGB = {
-    soft: '143,149,163',   /* --text-1 #8F95A3 */
-    volt: '204,255,0',     /* --volt  #CCFF00 */
-    cyan: '0,229,255',     /* --cyan  #00E5FF */
-  };
+  const DOT = '255,255,255';   /* puntini bianchi su nero */
 
   function attach(target, options) {
     const el = typeof target === 'string' ? document.querySelector(target) : target;
@@ -51,16 +47,14 @@ const BgFX = (() => {
     /* ---------- particelle ---------- */
     let ps = [];
     function makeParticle() {
-      const roll = Math.random();
-      const rgb = roll < 0.08 ? RGB.volt : roll < 0.16 ? RGB.cyan : RGB.soft;
       return {
         x: Math.random() * w,
         y: Math.random() * h,
         vx: (Math.random() - 0.5) * (reduced ? 0 : 0.22),
         vy: (Math.random() - 0.5) * (reduced ? 0 : 0.22),
         r: 0.6 + Math.random() * 1.3,
-        a: 0.14 + Math.random() * 0.30,
-        rgb,
+        a: 0.10 + Math.random() * 0.28,
+        rgb: DOT,
         ph: Math.random() * Math.PI * 2,
         spin: Math.random() < 0.5 ? -1 : 1,
       };
@@ -118,21 +112,15 @@ const BgFX = (() => {
 
       ctx.clearRect(0, 0, w, h);
 
-      /* luce: nucleo Volt + alone Ciano */
+      /* luce: alone bianco soffuso e molto debole */
       const i = opts.intensity * fade;
       if (i > 0.001) {
         const g1 = ctx.createRadialGradient(lx, ly, 0, lx, ly, R);
-        g1.addColorStop(0, 'rgba(204,255,0,' + (0.15 * i).toFixed(3) + ')');
-        g1.addColorStop(0.45, 'rgba(204,255,0,' + (0.05 * i).toFixed(3) + ')');
-        g1.addColorStop(1, 'rgba(204,255,0,0)');
+        g1.addColorStop(0, 'rgba(255,255,255,' + (0.05 * i).toFixed(3) + ')');
+        g1.addColorStop(0.5, 'rgba(255,255,255,' + (0.015 * i).toFixed(3) + ')');
+        g1.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = g1;
         ctx.fillRect(lx - R, ly - R, R * 2, R * 2);
-        const R2 = R * 1.9;
-        const g2 = ctx.createRadialGradient(lx, ly, 0, lx, ly, R2);
-        g2.addColorStop(0, 'rgba(0,229,255,' + (0.07 * i).toFixed(3) + ')');
-        g2.addColorStop(1, 'rgba(0,229,255,0)');
-        ctx.fillStyle = g2;
-        ctx.fillRect(lx - R2, ly - R2, R2 * 2, R2 * 2);
       }
 
       /* particelle: deriva, orbita attorno alla luce, brillano vicino al cursore */
