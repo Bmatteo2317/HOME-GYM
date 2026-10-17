@@ -92,6 +92,7 @@ async function boot() {
   if (page === 'stats') renderStatsPage();
   maybeShowOnboarding();
   paintReminder();
+  paintInstall();
 }
 
 /* ---------- PAGINA CLASSIFICHE GLOBALI (tutti e 4 gli esercizi) ---------- */
@@ -310,6 +311,46 @@ function paintReminder() {
   const banner = $('banner');
   if (banner && banner.parentElement) banner.after(el);
   else (($('app') || document.body)).prepend(el);
+}
+
+/* ---------- INSTALL PWA (CTA) ---------- */
+let installEvt = null;
+if (typeof window !== 'undefined') window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; paintInstall(); });
+function isStandalone() {
+  try { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+  catch (e) { return false; }
+}
+function iosSafariHint() {
+  const ua = navigator.userAgent || '';
+  return /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua);
+}
+function paintInstall() {
+  const box = $('installCard');
+  const page = document.body.dataset.page;
+  if (page !== 'home' || isStandalone() || (!installEvt && !iosSafariHint())) { if (box) box.remove(); return; }
+  if (box) return;
+  const el = document.createElement('div');
+  el.id = 'installCard';
+  el.className = 'card';
+  el.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px';
+  el.innerHTML = `<span style="font-size:24px">📲</span>
+    <div style="flex:1;min-width:0"><b style="font-size:14px">Installa HOME-GYM</b>
+    <p class="mu" style="font-size:11px">Come un'app vera: icona in home, schermo pieno, offline.</p></div>
+    <button onclick="doInstall()" class="tgo" style="border-radius:12px;padding:10px 14px;font-weight:800;font-size:12px">Installa</button>`;
+  const hero = document.querySelector('.card.hero');
+  if (hero && hero.parentElement) hero.after(el);
+  else (($('app') || document.body)).prepend(el);
+}
+async function doInstall() {
+  if (installEvt) {
+    try {
+      installEvt.prompt();
+      const r = await installEvt.userChoice;
+      if (r && r.outcome === 'accepted') { toast('🎉 App installata!'); installEvt = null; paintInstall(); }
+    } catch (e) {}
+    return;
+  }
+  if (iosSafariHint()) toast('iOS: tocca Condividi ⬆️ poi «Aggiungi a Home»');
 }
 
 /* ---------- ONBOARDING primo avvio ---------- */
