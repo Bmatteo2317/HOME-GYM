@@ -19,9 +19,13 @@ const variantLabel = (type, name) => TYPES[type].variantLabels?.[name] || name;
 const isoOf = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 const realToday = () => { const n = new Date(); n.setHours(0, 0, 0, 0); return n; };
 const selISO = () => { const d = realToday(); d.setDate(d.getDate() + dayOffset); return isoOf(d); };
+// Il DB può restituire le DATE come "YYYY-MM-DDTHH:mm:ssZ" (driver pg): le
+// normalizziamo a "YYYY-MM-DD" perché tutti i confronti data sono su stringhe.
+const fixDate = (w) => (w && w.date != null ? { ...w, date: String(w.date).slice(0, 10) } : w);
+const fixDates = (arr) => (arr || []).map(fixDate);
 const flag = (c) => ({ Italia: '🇮🇹', Francia: '🇫🇷', Germania: '🇩🇪', Spagna: '🇪🇸', Portogallo: '🇵🇹', 'Regno Unito': '🇬🇧', USA: '🇺🇸', Canada: '🇨🇦', Brasile: '🇧🇷', Argentina: '🇦🇷', Australia: '🇦🇺', Giappone: '🇯🇵' }[c] || '🏳️');
 function toast(m) { const t = $('toast'); if (!t) return; t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200); }
-async function api(p, o = {}) { const r = await fetch(p, { headers: { 'Content-Type': 'application/json' }, ...o }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || r.status); return d; }
+async function api(p, o = {}) { const r = await fetch(p, { cache: 'no-store', headers: { 'Content-Type': 'application/json' }, ...o }); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || r.status); return d; }
 function keyOf(w) { return w.category && w.variant ? w.category + ' · ' + w.variant : w.exercise; }
 function ofType(w, t) { return (w.category || '') === t || (w.exercise || '').startsWith(t + ' ·'); }
 function medal(i) { return i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1 + '°'; }
@@ -56,7 +60,7 @@ function paintTopbar() {
 /* ---------- dati ---------- */
 async function loadAll() {
   const [w, p] = await Promise.all([api('/api/workouts'), api('/api/workouts?type=profile')]);
-  data = w.workouts || [];
+  data = fixDates(w.workouts);
   if (p.profile) profile = { ...profile, ...p.profile };
   try {
     const g = parseInt(localStorage.getItem('hg_goal') || '', 10);
@@ -71,7 +75,7 @@ async function boot() {
     const b = $('banner'); if (b) b.classList.add('hidden');
   } catch (e) {
     try {
-      data = JSON.parse(localStorage.getItem('hg_w') || '[]');
+      data = fixDates(JSON.parse(localStorage.getItem('hg_w') || '[]'));
       profile = { ...profile, ...JSON.parse(localStorage.getItem('hg_p') || '{}') };
       const g = parseInt(localStorage.getItem('hg_goal') || '', 10);
       if (g > 0) goal = g;
@@ -468,7 +472,7 @@ async function saveDay() {
       method: 'POST',
       body: JSON.stringify({ category: TYPE, date, username: profile.username, country: profile.country, entries }),
     });
-    saved = result.workouts || [];
+    saved = fixDates(result.workouts);
   } catch (e) {
     console.error('Salvataggio giornata non riuscito:', e);
     saved = entries.map((entry, index) => ({
@@ -522,7 +526,7 @@ async function postEntry(val, varOverride) {
   const body = { category: TYPE, variant: vv, exercise: TYPE + ' · ' + vv, amount: parseInt(val, 10), unit: info.unit, date: selISO(), username: profile.username, country: profile.country };
   if (!body.amount || body.amount <= 0) { toast('❌ Valore non valido'); return false; }
   const before = snapshot();
-  try { const r = await api('/api/workouts', { method: 'POST', body: JSON.stringify(body) }); data.unshift(r.workout); }
+  try { const r = await api('/api/workouts', { method: 'POST', body: JSON.stringify(body) }); data.unshift(fixDate(r.workout)); }
   catch (e) { console.error('POST fallita:', e); data.unshift({ id: Date.now(), ...body, created_at: new Date().toISOString() }); toast('📴 Salvato in locale: ' + e.message); }
   renderHero(); renderGoalCard(); renderStats(); renderHistory(); paintTopbar();
   maybeCelebrate();
@@ -1012,7 +1016,7 @@ function importJSON(inp) {
       toast(`Importo ${fresh.length} serie…`);
       for (const e of fresh) {
         const body = { category: TYPE, variant: e.variant || variant || TYPES[TYPE].variants[0], exercise: TYPE + ' · ' + (e.variant || variant || TYPES[TYPE].variants[0]), amount: parseInt(e.amount), unit: TYPES[TYPE].unit, date: e.date, username: profile.username || e.username || 'Atleta', country: profile.country || e.country || 'Italia' };
-        try { const res = await api('/api/workouts', { method: 'POST', body: JSON.stringify(body) }); data.unshift(res.workout); }
+        try { const res = await api('/api/workouts', { method: 'POST', body: JSON.stringify(body) }); data.unshift(fixDate(res.workout)); }
         catch (err) { data.unshift({ id: Date.now() + Math.random(), ...body }); }
       }
       renderHero(); renderGoalCard(); renderStats(); renderHistory(); paintTopbar();

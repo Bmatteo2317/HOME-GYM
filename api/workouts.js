@@ -7,7 +7,12 @@
 // Diagnostica: GET /api/workouts?type=schema
 
 const crypto = require('crypto');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+// Il driver pg converte le colonne DATE in oggetti Date → JSON.stringify le
+// serializza come "2026-10-15T00:00:00.000Z", mentre il client confronta
+// stringhe "YYYY-MM-DD" (date === selISO(), range, ecc.). Forziamo il parser a
+// restituire la stringa pura (OID 1082 = DATE), come fa il driver Neon di PUSH-UP.
+types.setTypeParser(1082, (v) => v);
 let pool;
 function getPool() {
   if (!pool) {
@@ -17,7 +22,7 @@ function getPool() {
   return pool;
 }
 function send(res, status, data) {
-  res.status(status).setHeader('Content-Type', 'application/json');
+  res.status(status).setHeader('Content-Type', 'application/json').setHeader('Cache-Control', 'no-store');
   res.end(JSON.stringify(data));
 }
 
