@@ -1,0 +1,168 @@
+/* HOME-GYM · Design System "Cyber-Athletic" — Schermata B: Focus Mode (v1)
+   Fullscreen hands-free: anello di progresso, metrica gigante, overlay recupero ciano. */
+
+.fx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* ---------- Header ---------- */
+.fx-top { display: flex; align-items: center; gap: 10px; }
+.fx-head { flex: 1; min-width: 0; text-align: center; }
+.fx-head b { font-size: 16px; letter-spacing: .02em; }
+.fx-sub {
+  display: block;
+  color: var(--text-1);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.fx-x {
+  width: var(--tap); height: var(--tap);
+  flex: none;
+  border-radius: var(--r);
+  border: 1px solid var(--stroke);
+  background: var(--bg-1);
+  color: var(--text-0);
+  font-size: 16px;
+}
+
+/* ---------- Stage: anello + metrica ---------- */
+.fx-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.fx-ring { width: min(74vw, 340px); height: auto; transform: rotate(-90deg); }
+.fx-ring circle { fill: none; stroke-width: 10; stroke-linecap: round; }
+.fx-ring-track { stroke: rgba(255, 255, 255, .08); }
+.fx-ring-prog {
+  stroke: var(--volt);
+  stroke-dasharray: 578.1;
+  stroke-dashoffset: 578.1;
+  transition: stroke-dashoffset var(--fast) linear, stroke var(--med);
+  filter: drop-shadow(0 0 10px rgba(204, 255, 0, .35));
+}
+.fx-overlay.done .fx-ring-prog {
+  stroke: var(--cyan);
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, .45));
+}
+.fx-center { position: absolute; text-align: center; }
+.fx-metric {
+  font-size: var(--metric);
+  font-weight: 900;
+  letter-spacing: -.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.fx-unit {
+  color: var(--text-1);
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+
+/* ---------- Hint + controlli ---------- */
+.fx-hint {
+  text-align: center;
+  color: var(--text-1);
+  font-size: 12px;
+  min-height: 18px;
+  margin: 4px 0 12px;
+}
+.fx-controls { display: flex; justify-content: center; gap: 14px; }
+.fx-cbtn {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  background: var(--bg-1);
+  color: var(--text-0);
+  font-size: 22px;
+  font-weight: 800;
+  transition: transform var(--fast) var(--ease);
+}
+.fx-cbtn:active { transform: scale(.94); }
+.fx-cbtn-main {
+  background: var(--volt);
+  border: 0;
+  color: var(--bg-0);
+  font-size: 26px;
+  box-shadow: var(--glow-volt);
+}
+.fx-saved {
+  text-align: center;
+  color: var(--text-1);
+  font-size: 12px;
+  min-height: 16px;
+  margin: 10px 0 0;
+}
+
+/* ---------- Overlay recupero (ciano elettrico soffuso) ---------- */
+.fx-rest {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(0, 229, 255, .10);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.fx-rest[hidden] { display: none !important; }
+.fx-rest-lab {
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.fx-rest-num {
+  font-size: clamp(64px, 20vw, 132px);
+  font-weight: 900;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+  line-height: 1;
+}
+.fx-skip { min-height: var(--tap); }
+
+/* ---------- Flash di completamento ---------- */
+.fx-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(0, 229, 255, .35), transparent 65%);
+  transition: opacity 180ms var(--ease);
+}
+.fx-flash.on { opacity: 1; }
+
+/* ---------- Battito dell'anello mentre gira ---------- */
+@keyframes fx-pulse {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(204, 255, 0, .30)); }
+  50% { filter: drop-shadow(0 0 18px rgba(204, 255, 0, .55)); }
+}
+.fx-overlay.running .fx-ring-prog { animation: fx-pulse 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-overlay.running .fx-ring-prog { animation: none; }
+}

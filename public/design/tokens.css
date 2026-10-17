@@ -1,0 +1,40 @@
+/* HOME-GYM · Design System "Cyber-Athletic" — Token (v1)
+   Sorgente unica di verità per colori, tipografia, geometria e motion.
+   Caricalo SEMPRE per primo: tutti gli altri file dipendono solo da queste variabili. */
+:root {
+  /* ---------- Sfondi ---------- */
+  --bg-0: #0D0E12;                 /* Background primario (nero profondo) */
+  --bg-1: #1A1C24;                 /* Card / contenitori (antracite) */
+  --bg-2: #22252E;                 /* Contenitori annidati, hover */
+  --stroke: rgba(255, 255, 255, .08);
+
+  /* ---------- Accenti ---------- */
+  --volt: #CCFF00;                 /* Giallo neon: azione, progresso, focus */
+  --cyan: #00E5FF;                 /* Ciano elettrico: successo, record, recupero */
+  --volt-dim: rgba(204, 255, 0, .35);
+  --cyan-dim: rgba(0, 229, 255, .35);
+
+  /* ---------- Testo ---------- */
+  --text-0: #FFFFFF;               /* Titoli e metriche */
+  --text-1: #8F95A3;               /* Etichette, unità, descrizioni */
+
+  /* ---------- Tipografia ---------- */
+  --font: Inter, "Roboto Flex", Montserrat, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --metric: clamp(84px, 27vw, 168px);  /* metrica gigante: ≥72pt su telefoni, leggibile a 2 m */
+
+  /* ---------- Geometria ---------- */
+  --r: 12px;                       /* raggio fisso di card e pulsanti */
+  --r-pill: 999px;
+  --gap: 12px;
+  --pad: 16px;
+  --tap: 44px;                     /* target minimo tocco */
+
+  /* ---------- Glow ---------- */
+  --glow-volt: 0 0 24px rgba(204, 255, 0, .35);
+  --glow-cyan: 0 0 24px rgba(0, 229, 255, .35);
+
+  /* ---------- Motion ---------- */
+  --fast: 140ms;
+  --med: 260ms;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
