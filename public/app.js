@@ -220,6 +220,60 @@ function shareWeek() {
   const days = new Set(mine.filter((w) => w.date >= weekStart && w.date <= today).map((w) => w.date)).size;
   shareIt(`📅 HOME-GYM · La mia settimana: ${tw.toLocaleString('it-IT')} ripetizioni in ${days} giorni 🔥. Batti questo:`, location.origin + '/index.html');
 }
+function ago(ts) {
+  const t = new Date(ts).getTime();
+  if (!t || !Number.isFinite(t)) return '';
+  const m = Math.floor((Date.now() - t) / 60000);
+  if (m < 1) return 'ora';
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + ' h';
+  return Math.floor(h / 24) + ' g';
+}
+
+/* ---------- DUELLO 1v1 nella stanza ---------- */
+function setRival(username) {
+  if (!username || !rank.room || username === profile.username) return;
+  try { localStorage.setItem('hg_rival_' + rank.room, username); } catch (e) {}
+  toast('⚔️ Duello con @' + username + '!');
+  loadRank();
+}
+function clearRival() {
+  try { localStorage.removeItem('hg_rival_' + rank.room); } catch (e) {}
+  loadRank();
+}
+function duelVal(r) {
+  if (!r) return 0;
+  return rank.metric === 'streak' ? Number(r.streak ?? 0) : rank.metric === 'pr' ? Number(r.best || 0) : Number(r.total || 0);
+}
+function renderDuelHtml() {
+  if (rank.scope !== 'room' || !rank.room || !profile.username) return '';
+  let rival = ''; try { rival = localStorage.getItem('hg_rival_' + rank.room) || ''; } catch (e) {}
+  if (!rival) return '<p class="mu" style="font-size:11px;text-align:center;margin:4px 0 8px">👆 Tocca un atleta per sfidarlo 1v1</p>';
+  const rivRow = rank.rows.find((r) => r.username === rival);
+  if (!rivRow) return `<div class="card" style="margin-bottom:10px;border-color:rgba(251,113,133,.4)"><div class="row sp"><b style="font-size:14px">⚔️ Duello vs @${esc(rival)}</b><button onclick="clearRival()" class="mu" style="background:none;border:0;font-size:11px;text-decoration:underline">cambia</button></div><p class="mu" style="font-size:12px;margin-top:6px">@${esc(rival)} non ha ancora numeri in questa classifica. Aspetta o cambia rivale.</p></div>`;
+  const meRow = rank.rows.find((r) => r.username === profile.username);
+  const unit = (rivRow.top_unit || (meRow && meRow.top_unit)) === 'seconds' ? 's' : '';
+  const suf = rank.metric === 'streak' ? '🔥' : unit;
+  const mine = duelVal(meRow), riv = duelVal(rivRow);
+  const sum = mine + riv || 1;
+  const myPct = Math.round(mine / sum * 100);
+  const ahead = mine >= riv, diff = Math.abs(mine - riv);
+  return `<div class="card" style="margin-bottom:10px;border-color:${ahead ? 'rgba(163,230,53,.5)' : 'rgba(251,113,133,.5)'}">
+    <div class="row sp"><b style="font-size:14px">⚔️ Duello · @${esc(profile.username)} vs @${esc(rival)}</b>
+      <button onclick="clearRival()" class="mu" style="background:none;border:0;font-size:11px;text-decoration:underline">cambia</button></div>
+    <div style="display:flex;height:10px;border-radius:6px;overflow:hidden;margin:10px 0 6px;background:rgba(255,255,255,.08)">
+      <div style="width:${myPct}%;background:var(--accent)"></div><div style="flex:1;background:#fb7185"></div></div>
+    <div class="row sp"><b>${mine.toLocaleString('it-IT')}${suf} · tu</b><b>${riv.toLocaleString('it-IT')}${suf} · ${esc(rival)}</b></div>
+    <p class="mu" style="font-size:12px;margin-top:6px">${mine === riv ? '🤝 Perfetta parità!' : ahead ? `🏆 Sei avanti di ${diff.toLocaleString('it-IT')}${suf} — difendi il vantaggio!` : `🔥 @${esc(rival)} è avanti di ${diff.toLocaleString('it-IT')}${suf} — recupera!`}</p>
+    <button onclick="shareDuel()" class="touch press glass" style="width:100%;margin-top:8px;border-radius:12px;padding:9px;font-weight:800;font-size:13px">🚀 Condividi il duello</button>
+  </div>`;
+}
+function shareDuel() {
+  let rival = ''; try { rival = localStorage.getItem('hg_rival_' + rank.room) || ''; } catch (e) {}
+  if (!rival || !profile.username) return;
+  shareIt(`⚔️ @${profile.username} vs @${rival} — duello nella stanza "${rank.roomName || rank.room}" su HOME-GYM. Chi vince? Schierati:`, roomLink(rank.room));
+}
 
 /* ---------- PROMEMORIA SERALE (in-app, zero infra) ---------- */
 function reminderGo() {
@@ -1217,7 +1271,7 @@ function paintRankSeg() {
   if (dim) on('gAll', true);
   const rp = $('roomPanel'); if (rp) rp.classList.toggle('hidden', rank.scope !== 'room');
 }
-function rankRow(r, i, metric) {
+function rankRow(r, i, metric, pickable) {
   const cat = r.top_category || TYPE, vari = r.top_variant || 'Generale';
   const icon = (TYPES[cat] || {}).icon || '🏋️';
   const isMe = r.username === profile.username;
@@ -1225,7 +1279,8 @@ function rankRow(r, i, metric) {
   const score = metric === 'pr' ? r.best + (unit || '') : metric === 'streak' ? (r.streak ?? 0) + '🔥' : Number(r.total ?? r.score ?? 0).toLocaleString('it-IT');
   const sub = metric === 'pr' ? `vol ${Number(r.total || 0)} · ×${r.entries}` : metric === 'streak' ? `vol ${Number(r.total || 0)} · PR ${r.best}` : `🏆 max ${r.best} · ×${r.entries}`;
   const med = i === 0 ? 'medal1' : i === 1 ? 'medal2' : i === 2 ? 'medal3' : '';
-  return `<div class="lb-row"><span class="lb-pos ${med}">${i + 1}</span>
+  const tap = pickable && !isMe ? ` onclick="setRival('${esc(r.username)}')" style="cursor:pointer"` : '';
+  return `<div class="lb-row"${tap}><span class="lb-pos ${med}">${i + 1}</span>
     <span class="lb-name">${icon} ${esc(vari || '—')} <span class="lb-sub">@${esc(r.username)}${isMe ? ' · TU' : ''} · ${flag(r.country)} ${esc(r.country || '')} · ${esc(cat || '')}</span><br><span class="lb-sub">${sub}</span></span>
     <span class="lb-val">${score}</span></div>`;
 }
@@ -1240,7 +1295,8 @@ async function loadRank() {
   } catch (e) { rank.rows = localRank(ex); }
   const mLabel = rank.metric === 'pr' ? '🏆 PR' : rank.metric === 'streak' ? '🔥 Streak' : '📦 Volume';
   const box = $('rankList'); if (!box) return;
-  box.innerHTML = (rank.rows.length ? rank.rows.map((r, i) => rankRow(r, i, rank.metric)).join('')
+  const duelHtml = renderDuelHtml();
+  box.innerHTML = duelHtml + (rank.rows.length ? rank.rows.map((r, i) => rankRow(r, i, rank.metric, rank.scope === 'room')).join('')
       : '<p class="mu" style="text-align:center;padding:16px 0;font-size:13px">Nessuno qui — sii il primo! 🚀</p>');
   const lab = $('rankLabel'); if (lab) lab.textContent = `${mLabel} · ${ex}`;
   if (lab && profile.username) {
@@ -1311,6 +1367,11 @@ async function loadRoomPanel() {
         ${mine ? '' : `<button onclick="joinRoom()" style="flex:1;font-size:14px">➕ Unisciti</button>`}
       </div>
       <button onclick="leaveRoom()" class="mu" style="font-size:11px;text-decoration:underline;background:none;border:0;min-height:32px;padding:4px 0">Esci dalla stanza / cambia codice</button></div>`;
+    try {
+      const fr = await api('/api/workouts?type=room_feed&code=' + encodeURIComponent(rank.room));
+      const feed = fr.feed || [];
+      if (feed.length) box.insertAdjacentHTML('beforeend', `<div class="card roombox" style="margin-top:8px"><p style="font-weight:800;font-size:14px">📰 Attività degli amici</p>${feed.slice(0, 8).map((f) => `<div class="row sp" style="margin-top:8px"><span style="min-width:0"><b>@${esc(f.username)}</b> <span class="mu" style="font-size:12px">${esc(f.exercise || ((f.category || '') + (f.variant ? ' · ' + f.variant : '')))}</span></span><span style="white-space:nowrap"><b>+${f.amount}${f.unit === 'seconds' ? 's' : ''}</b> <span class="mu" style="font-size:11px">${ago(f.created_at)}</span></span></div>`).join('')}</div>`);
+    } catch (e2) {}
   } catch (e) { box.innerHTML = `<p class="dng" style="font-size:12px">Stanza non trovata. <button onclick="leaveRoom()" class="underline">Reset</button></p>`; }
 }
 async function createRoom() {

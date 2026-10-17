@@ -2,7 +2,7 @@
 // Workouts: GET /api/workouts · POST /api/workouts · PATCH /api/workouts?id= · DELETE /api/workouts?id=
 // Leaderboard: GET /api/workouts?type=leaderboard&scope=global|country&country=&period=today|week|all&metric=volume|pr|streak&exercise=&room=CODE
 // Stanze: GET /api/workouts?type=rooms · POST type=rooms {name, exercise, username, country}
-//         POST type=room_join {code, username, country} · GET type=room&code=
+//         POST type=room_join {code, username, country} · GET type=room&code= · GET type=room_feed&code=
 // Profilo: GET/POST /api/workouts?type=profile
 // Diagnostica: GET /api/workouts?type=schema
 
@@ -202,6 +202,19 @@ module.exports = async (req, res) => {
       if (!r.rowCount) return send(res, 404, { error: 'stanza non trovata' });
       const m = await client.query('SELECT username,country,joined_at FROM room_members WHERE room_code=$1 ORDER BY joined_at', [code]);
       return send(res, 200, { room: r.rows[0], members: m.rows });
+    }
+    if (type === 'room_feed' && req.method === 'GET') {
+      const code = String(req.query.code || '').trim().toUpperCase();
+      if (!code) return send(res, 400, { error: 'codice stanza mancante' });
+      const r = await client.query(
+        `SELECT w.username, w.country, w.category, w.variant, w.exercise, w.amount, w.unit, w.date, w.created_at
+         FROM workouts w
+         JOIN room_members m ON m.room_code = $1 AND m.username = w.username
+         ORDER BY w.created_at DESC, w.id DESC
+         LIMIT 20`,
+        [code]
+      );
+      return send(res, 200, { feed: r.rows.map((x) => ({ ...x, amount: Number(x.amount) })) });
     }
 
     // ---------- LEADERBOARD (volume | pr | streak), con filtro stanza ----------
