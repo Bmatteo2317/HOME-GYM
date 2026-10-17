@@ -170,6 +170,10 @@ function renderHomeStatsSub(me) {
     : 'Streak · volumi · PR · medie';
 }
 
+/* Formato date compatto (come PUSH-UP): "17 ott" e "sab 17 ott 2026" */
+const fmtLong = (s) => new Date(s + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+const fmtDate = (s) => new Date(s + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
 /* Pagina dedicata: statistiche generali del profilo, layout spazioso */
 function renderStatsPage() {
   paintTopbar();
@@ -187,6 +191,10 @@ function renderStatsPage() {
     return;
   }
   const mine = data.filter((w) => w.username === me);
+  if (!mine.length) {
+    $('statsBody').innerHTML = '<div class="empty">Registra il tuo primo allenamento<br>dalla Home 💪</div>';
+    return;
+  }
   const days = new Set(mine.map((w) => w.date)).size;
   const vol = mine.reduce((s, w) => s + w.amount, 0);
   const today = isoOf(realToday());
@@ -201,14 +209,29 @@ function renderStatsPage() {
     return `<div class="row sp" style="margin-top:6px"><span><span class="dot" style="background:${i.accent};color:${i.accent}"></span> ${esc(t)}</span>
       <span><b>${(days ? exerciseTotal / days : 0).toFixed(1)}${unit}</b> <span class="mu">/giorno · tot ${exerciseTotal.toLocaleString('it-IT')}${unit}</span></span></div>`;
   }).join('');
+  const prCards = Object.entries(TYPES).map(([t, i]) => {
+    const unit = i.unit === 'seconds' ? 's' : '';
+    let best = { v: 0, d: null };
+    mine.filter((w) => ofType(w, t)).forEach((w) => { if (w.amount > best.v) best = { v: w.amount, d: w.date }; });
+    return `<div class="kpi pr"><b>${best.v ? best.v + unit : '—'}</b><small>${esc(t)}</small>
+      <div class="when">${best.d ? 'max serie · ' + fmtLong(best.d) : 'nessuna serie'}</div></div>`;
+  }).join('');
+  const perDay = {};
+  mine.forEach((w) => { perDay[w.date] = (perDay[w.date] || 0) + w.amount; });
+  const bestDay = Object.entries(perDay).reduce((b, [d, tot]) => (tot > b.tot ? { tot, d } : b), { tot: 0, d: null });
   $('statsBody').innerHTML = `<div class="grid3">
       <div class="kpi"><b>${totalInRange(today)}</b><small>Oggi</small></div>
       <div class="kpi"><b>${totalInRange(weekStart)}</b><small>Settimana</small></div>
       <div class="kpi"><b>${totalInRange(monthStart)}</b><small>Mese</small></div>
     </div>
-    <h2>Medie sui giorni allenati: ${days}</h2>
-    <div class="card"><div class="row sp"><span>Volume totale</span><b>${vol.toLocaleString('it-IT')}</b></div>
-      <div class="row sp" style="margin-top:6px"><span>Media giornaliera</span><b>${(days ? vol / days : 0).toFixed(1)}</b></div>
+    <h2>🏆 Record personali</h2>
+    <div class="grid3">${prCards}</div>
+    <div class="card pr" style="display:flex;justify-content:space-between;align-items:center">
+      <div><b style="font-size:22px">${bestDay.tot.toLocaleString('it-IT')}</b>
+        <div class="when">miglior giornata${bestDay.d ? ' · ' + fmtDate(bestDay.d) : ''}</div></div>
+      <span style="font-size:30px">🔥</span></div>
+    <h2>Medie · ${days} giorni allenati · tot ${vol.toLocaleString('it-IT')}</h2>
+    <div class="card"><div class="row sp"><span>Media giornaliera</span><b>${(days ? vol / days : 0).toFixed(1)}</b></div>
       ${avgByExercise}</div>
     <h2>Ultimi 14 giorni</h2>
     <div class="card"><div id="statsChart"></div></div>
